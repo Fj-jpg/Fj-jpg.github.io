@@ -1,0 +1,189 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Grid Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #grid {
+            margin-top: 20px;
+            display: grid;
+            gap: 5px;
+        }
+        .photo-cell {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+        }
+        .grid-3x3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        .grid-2x2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .download-links {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Photo Grid Generator</h1>
+    
+    <div>
+        <label for="grid-type">Choose Grid:</label>
+        <select id="grid-type">
+            <option value="9">3x3 (Nine Grid)</option>
+            <option value="4">2x2 (Four Grid)</option>
+        </select>
+    </div>
+    
+    <div>
+        <input type="file" id="image-input" multiple accept="image/*">
+        <button onclick="generateGrid()">Generate Grid</button>
+    </div>
+    
+    <div id="grid"></div>
+    <div class="download-links" id="download-links"></div>
+    <button onclick="downloadAll()">Download All Grids and Images</button>
+    <button onclick="extractAllImages()">Extract All Images from Page</button>
+
+    <canvas id="canvas" style="display: none;"></canvas>
+
+    <script>
+        const gridElement = document.getElementById('grid');
+        const downloadLinksElement = document.getElementById('download-links');
+        const canvas = document.getElementById('canvas');
+        let selectedImages = [];
+        let gridDataUrls = [];
+
+        const GRID_WIDTH = 1080;  
+        const GRID_HEIGHT = 1440;
+
+        function generateGrid() {
+            const input = document.getElementById('image-input');
+            const gridType = document.getElementById('grid-type').value;
+            const files = Array.from(input.files);
+            
+            const gridSize = gridType == 9 ? 3 : 2; 
+            const requiredCount = gridType == 9 ? 9 : 4;
+
+            if (files.length === 0) {
+                alert("Please select some images.");
+                return;
+            }
+
+            gridElement.innerHTML = '';
+            downloadLinksElement.innerHTML = '';
+            gridDataUrls = [];
+
+            const shuffledFiles = files.sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < shuffledFiles.length; i += requiredCount) {
+                const currentGroup = shuffledFiles.slice(i, i + requiredCount);
+                if (currentGroup.length === requiredCount) {
+                    createGrid(currentGroup, gridSize);
+                }
+            }
+        }
+
+        function createGrid(imageFiles, gridSize) {
+            const cellWidth = GRID_WIDTH / gridSize;  
+            const cellHeight = GRID_HEIGHT / gridSize; 
+
+            canvas.width = GRID_WIDTH;
+            canvas.height = GRID_HEIGHT;
+
+            const ctx = canvas.getContext('2d');
+            const imgElements = [];
+
+            imageFiles.forEach((file, index) => {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                imgElements.push({ imgElement: img, file });
+            });
+
+            Promise.all(imgElements.map(imgObj => new Promise(resolve => {
+                imgObj.imgElement.onload = () => resolve();
+            }))).then(() => {
+                imgElements.forEach((imgObj, index) => {
+                    const row = Math.floor(index / gridSize);
+                    const col = index % gridSize;
+                    ctx.drawImage(imgObj.imgElement, col * cellWidth, row * cellHeight, cellWidth, cellHeight);
+                });
+
+                const gridDataUrl = canvas.toDataURL();
+                gridDataUrls.push(gridDataUrl);
+                
+                const gridImgElement = document.createElement('img');
+                gridImgElement.src = gridDataUrl;
+                gridImgElement.style.width = "300px"; 
+                gridElement.appendChild(gridImgElement);
+                
+                const gridLink = document.createElement('a');
+                gridLink.href = gridDataUrl;
+                gridLink.download = `Grid-${gridSize}x${gridSize}-${gridDataUrls.length}.png`;
+                gridLink.innerText = `Download Grid ${gridDataUrls.length}`;
+                downloadLinksElement.appendChild(gridLink);
+                downloadLinksElement.appendChild(document.createElement('br'));
+
+                imgElements.forEach((imgObj, index) => {
+                    const imgDownloadLink = document.createElement('a');
+                    imgDownloadLink.href = imgObj.imgElement.src;
+                    imgDownloadLink.download = `Image-${index + 1}-Grid-${gridDataUrls.length}.png`;
+                    imgDownloadLink.innerText = `Download Image ${index + 1} from Grid ${gridDataUrls.length}`;
+                    downloadLinksElement.appendChild(imgDownloadLink);
+                    downloadLinksElement.appendChild(document.createElement('br'));
+                    
+                    const displayImg = document.createElement('img');
+                    displayImg.src = imgObj.imgElement.src;
+                    displayImg.style.width = "100px";
+                    gridElement.appendChild(displayImg);
+                });
+            });
+        }
+
+        function downloadAll() {
+            if (gridDataUrls.length === 0) {
+                alert("No grids have been generated yet.");
+                return;
+            }
+
+            gridDataUrls.forEach((dataUrl, index) => {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `Grid-${index + 1}.png`;
+                link.click();
+            });
+
+            const downloadLinks = document.querySelectorAll('.download-links a');
+            downloadLinks.forEach(link => {
+                if (link.download.includes('Image')) {
+                    setTimeout(() => link.click(), 100);
+                }
+            });
+        }
+
+        function extractAllImages() {
+            const allImages = document.querySelectorAll('img');
+            let delay = 0;
+            allImages.forEach((img, index) => {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = img.src;
+                    link.download = `Extracted-Image-${index + 1}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }, delay);
+                delay += 200;  // Add delay to avoid browser blocking rapid downloads
+            });
+        }
+    </script>
+
+</body>
+</html>
